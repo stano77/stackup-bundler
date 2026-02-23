@@ -1,23 +1,47 @@
-# fly.toml app configuration file generated for stackup-bundler on 2026-02-23T11:14:57Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# fly.toml app configuration file for stackup-bundler on Base Mainnet (ERC-4337 v0.7)
+# Optimized for Base chain ID 8453 + EntryPoint v0.7
+# https://docs.base.org + ERC-4337 specs
 
-app = 'stackup-bundler'
-primary_region = 'fra'
-
-[build]
+app = "stackup-bundler"
+primary_region = "ams"  # Change if you prefer closer region (e.g., ord for US)
 
 [http_service]
-  internal_port = 8080
+  internal_port = 4337
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = "stop"
   auto_start_machines = true
   min_machines_running = 0
-  processes = ['app']
+  processes = ["app"]
 
+  # Basic health check: Bundler RPC responds OK-ish to GET /
+  [http_service.checks.health]
+    grace_period = "15s"      # Allow time for Badger init + config load
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    path = "/"
+
+# VM resources: Base can see decent volume → more memory helps Badger + processing
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
+  cpu_kind = "shared"
   cpus = 1
-  memory_mb = 1024
+  memory_mb = 1024           # 1 GB; increase to 2048 if high traffic / OOM kills
+
+# Recommended: Persistent volume for Badger DB (mempool, nonces, etc.)
+# Create first: fly volumes create bundler_data --size 2 --region ams -a stackup-bundler
+# [mounts]
+#   source = "bundler_data"
+#   destination = "/data"
+
+# Public / default env vars (override via secrets where sensitive)
+[env]
+  ERC4337_BUNDLER_PORT = "4337"
+  ERC4337_BUNDLER_CHAIN_ID = "8453"                          # Base Mainnet
+  ERC4337_BUNDLER_ENTRY_POINT = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"  # v0.7 official
+  # ERC4337_BUNDLER_DATA_DIRECTORY = "/data"                 # If using mount above
+  # ERC4337_BUNDLER_ETH_CLIENT_URL = "https://..."           # Set as secret!
+  # ERC4337_BUNDLER_PRIVATE_KEY = "your_64_hex_chars_here"   # Set as secret!
+
+# Deployment strategy
+[deploy]
+  strategy = "rolling"
